@@ -48,7 +48,7 @@ pipeline {
           '''}
       }
     }
-    /*stage('Run Docker Container') {
+    stage('Run Docker Container') {
       steps {
         echo 'Running Java Application'
         bat '''
@@ -57,7 +57,7 @@ pipeline {
         
         '''               
       }
-    }*/
+    }
   }
   post {
     success {
