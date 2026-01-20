@@ -1,70 +1,82 @@
 pipeline {
   agent any
+
   tools {
     jdk 'Java17'
     maven 'Maven'
   }
+
+  environment {
+    DOCKER_USER = "wipakhilesh"
+    IMAGE_NAME = "indiaproj"
+    IMAGE_TAG = "1.0"
+  }
+
   stages {
+
     stage('Checkout Code') {
       steps {
-        echo 'Pulling from Github'
-        git branch: 'main', credentialsId: 'mygithubcred', url: 'https://github.com/chntraining/k8test.git'
+        git branch: 'master',
+            credentialsId: 'github-key',
+            url: 'https://github.com/sunnysingh94275-ai/k8test.git'
       }
     }
-    stage('Test Code') {
-      steps {
-        echo 'JUNIT Test case execution started'
-        bat 'mvn clean test'
-        
-      }
+
       post {
         always {
-		  junit '**/target/surefire-reports/*.xml'
-          echo 'Test Run is SUCCESSFUL!'
+          junit '**/target/surefire-reports/*S.xml'
         }
-
       }
     }
-    stage('Build Project') {
+
+    stage('Build JAR') {
       steps {
-        echo 'Building Java project'
         bat 'mvn clean package -DskipTests'
       }
     }
-    stage('Build the Docker Image') {
+
+    stage('Build Docker Image') {
       steps {
-        echo 'Building Docker Image'
-        bat 'docker build -t myindiaproj:1.0 .'
+        bat """
+			cd indiaproj docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
+        """
       }
     }
+
     stage('Push Docker Image to DockerHub') {
       steps {
-        echo 'Pushing  Docker Image'
+        echo 'Pushing Docker Image'
         withCredentials([string(credentialsId: 'dockerhubpwd', variable: 'DOCKER_PASS')]) {
-  	      bat '''
-          echo %DOCKER_PASS% | docker login -u deepikkaa20 --password-stdin
-          docker tag myjavaproj:1.0 deepikkaa20/myindiaproj:1.0
-          docker push deepikkaa20/myindiaproj:1.0
-          '''}
+          bat '''
+            echo "$DOCKER_PASS" | docker login -u wipakhilesh --password-stdin
+            docker push wipakhilesh/indiaproj:latest
+          '''
+        }
       }
     }
-    stage('Run Docker Container') {
+
+    stage('Deploy Project to K8s') {
       steps {
-        echo 'Running Java Application'
-        bat '''
-        docker rm -f myjavaproj-container || exit 0
-        docker run --name myjavaproj-container myjavaproj:1.0
-        
-        '''               
+        bat """
+        minikube delete
+        minikube start
+        minikube image load wipakhilesh/indiaproj:1.0
+        kubectl apply -f deployment.yaml
+        kubectl apply -f services.yaml
+        kubectl get pods
+        kubectl get services
+        minikube addons enable dashboard
+        """
       }
     }
   }
+
   post {
     success {
-      echo 'BUild and Run is SUCCESSFUL!'
+      echo 'Pipeline Executed Successfully!'
     }
     failure {
-      echo 'OOPS!!! Failure.'
+      echo 'Pipeline Failed — Check Logs'
     }
   }
 }
